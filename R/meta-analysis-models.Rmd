@@ -1,0 +1,228 @@
+---
+title: 'Phylogenetic meta-analytic models'
+author: "Eve Cooper, Daniel Noble, Loeske Kruuk, Micheal Jennions, Matt Symonds, Tim Bonnett, Shinichi Nakagawa et al."
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+margin: 1.5cm
+font: 12pt
+output:
+  html_document:
+    code_folding: hide
+    theme: united
+    toc: yes
+    toc_float: yes
+always_allow_html: yes
+---
+
+# Purpose
+We would like to better understand the impact that controlling for phylogeny has on meta-analytic results. To this end, we will explore in more detail analyses from Chamberlain *et al.* 2012, that concluded that controlling for phylogeny was critical in meta-analysis and showed how overall conclusions could be modified in important ways. 
+
+We'll start by simply re-running phylogenetic and non-phylogenetic meta-analytic models using two, rather simple, datasets that were compiled by Chamberlain *et al.* 2012. The data and tree files are all available. We'll fit these models using `metafor` and `MCMCglmm` as they provide sufficient flexibility to fit simple fixed, random and multi-level meta-analytic models in the same framework.
+
+# Packages needed
+Load  the necessary packages and their dependencies
+```{r echo = TRUE, eval = TRUE, message = FALSE, warning = FALSE}
+	pacman::p_load(metafor, MCMCglmm, kableExtra, tidyverse, phytools, ape)
+```
+
+# Datasets
+We will use two datasets, Agrawal et al. 2005 and Bolnick and Preisser 2005. These datasets can be loaded and explored as follows:
+
+```{r echo = TRUE, eval = TRUE, message = FALSE, warning = FALSE}
+# Load datasets
+	agrawal <- read.table("../datasets/AgrawalEtal2005Ecology_data.txt")
+	bolnick <- read.table("../datasets/Bolnick&Preisser2005Ecology_data.txt")
+
+# Datasets didn't come with column headers, for some unknown reason, so lets just clean that up. They have the same number of columns, and in the same order, so I will do this in one step.
+	colnames(agrawal) <- colnames(bolnick) <- c("spp", "es", "sv", "inc")
+```
+We can also explore the datasets
+
+First Agrawal et al. 2005:
+```{r echo = TRUE, eval = TRUE, message = FALSE, warning = FALSE}
+	kable(agrawal) %>%
+	kable_styling(font = 10) %>%
+  	scroll_box(width = "100%", height = "200px")
+```
+We can see that we have more generic species groups here. It is not down to the species level.
+
+We can also have a look at Bolnick & Preisser 2005:
+```{r echo = TRUE, eval = TRUE, message = FALSE, warning = FALSE}
+	kable(bolnick) %>%
+	kable_styling(font = 10) %>%
+  	scroll_box(width = "100%", height = "200px")
+```
+Here we have a dataset that has species-level phylogenetic information.
+
+# Phylogenetic trees
+
+We also have the phylogenetic trees. We can have a look at each of these.
+```{r echo = TRUE, eval = TRUE, message = FALSE, warning = FALSE}
+# Read the trees
+agrawal_tree <- read.tree("../tree/AgrawalEtal2005Ecology_tree.txt")
+bolnick_tree <- read.tree("../tree/Bolnick&Preisser2005Ecologytree.txt")
+
+# Plot the trees to have a look
+par(mfrow = c(1,2), mar = c(0,0,1,0))
+plot(agrawal_tree, type = "phylogram", main = "Agrawal et al. 2005")
+plot(bolnick_tree, type = "phylogram", main = "Bolnick & Preisser, 2005")
+
+# We need to check trees are ultmetric
+is.ultrametric(agrawal_tree) # TRUE
+is.ultrametric(bolnick_tree) # FALSE
+
+# Need to make trees ultrametric
+bolnick_tree <- force.ultrametric(bolnick_tree)
+is.ultrametric(bolnick_tree) # TRUE
+```
+
+We now need to convert these phylogenetic trees to phylogenetic (co)variance/correlation matrices (one or the other are most important depending on the circumstance).
+
+```{r echo = TRUE, eval = TRUE, message = FALSE, warning = FALSE}
+# For metafor, we use a correlation matrix
+	A_metafor_agrawal <- ape::vcv(agrawal_tree, corr = TRUE)
+	A_metafor_bolnick <- ape::vcv(bolnick_tree, corr = TRUE)
+
+# For MCMCglmm we use the inverse of the (co)variance matrix. Maybe scale (can't remember if this will make much of a difference when we use ginverse – Dan to check.) – DN Checked...use scale
+	A_MCMCglmm_agrawal <- MCMCglmm::inverseA(agrawal_tree, scale =TRUE)$Ainv
+	A_MCMCglmm_bolnick <- MCMCglmm::inverseA(bolnick_tree, scale = TRUE)$Ainv
+```
+
+Great. Now we have the matrices we need to feed into the phylogenetic meta-analytic models. We'll run these next.
+
+# Meta-analytic models
+Chamberlain et al. 2012 ran fixed, random and phylogenetic versions of each of these models, but they ran these in some custom package. To sort out what they actually ran, and if we can match their results, we'll start out with what I think they did. Although, I could be wrong.
+
+We'll first start off fitting models with metafor as this holds the traditional philosophical structure for meta-analytic models. We need to remember, because of this, by default metafor does NOT fit a residual error. This is weird, I know, but relates back to how meta-analysis was conceived. Common/fixed effect models originally were conceived thinking that the sample if "studies" were so homogeneous and experiments run in such identical ways that the only real reason why effects would differ across studies was because they have different sampling variance. As such, all the residual or within-study variance was thought to be completely explained by the known sampling variance. This is pretty bonkers when you think about this assumption – it really only applies is very, very restricted situations. For example, like when a lab, running the same experiment, with samples of the same species and population have repeatable run the experiment and want to combine the statistical results. Obviously, to think fixed effect models are even remotely useful in complex datasets in ecology and evolution is probably a stretch. Hence, we don't recommend fixed effect models. Rather, its better to run a random effects model as it better captures sources of variance likely encountered...but still makes some odd assumption. The random-effects model at least acknowledges that studies ate likely to differ from one another, and explicitly estimate a between study variance. However, it still assumes that all within study variance is a result from sampling error.
+
+## Bolnick & Preisser, 2005 data – `metafor`
+#### Fixed Effect Model
+```{r echo = TRUE, eval = TRUE, message = FALSE, warning = FALSE}
+
+	# Fixed/common effects model
+		mod1_FE <- rma(es ~ 1, vi = sv, method = "FE", data = bolnick)
+		summary(mod1_FE)
+```
+This effect is similar to the fixed effect estimated for the supposed "fixed-effects phylogenetic model" in Chamberlain *et al.* 2012. I don't yet understand how they did a fixed effect model with a phylogeny, but I can't actually reproduce the supposed 'fixed effect model estimate', which is > 1.5, so I am not quite sure what they have done (maybe mixed up estimates???). Nonetheless, for these datasets the fixed effect models are not particularly useful in my opinion. 
+
+#### Random Effect Model 
+```{r echo = TRUE, eval = TRUE, message = FALSE, warning = FALSE}
+	# Random effects model. Here, we need to assume that each species is a study
+		mod2_RE <- rma(es ~ 1, vi = sv, data = bolnick)
+		summary(mod2_RE)
+
+```
+Here, our estimates from the random effects model match the supposed phylogenetic estimate almost to the dot, as well as the CI's. Although, funny enough what we are seeing is that there is little difference between phylogeny and random effects model here anyway. You will also note that, despite this being a random effects model there is no residual/observation-level error estimated, which in this case is simply captured by the between study variance as we have one data point per study. Within study sampling variance is assumed to be the sampling variance. 
+
+#### Phylogenetic Random Effects Model
+
+Now we will move to some new syntax. First, to get a better sense of how the above random effects model relates to syntax in the multi-level random effects model world, we can change to the multi-level context as follows and estimate what is the identical random effects model (without the added Q stats etc).
+
+```{r echo = TRUE, eval = TRUE, message = FALSE, warning = FALSE}
+	bolnick$r <- 1:nrow(bolnick)
+
+	# Random effects model. Here, we need to assume that each species is a study
+		mod3_RE <- rma.mv(es ~ 1, V = sv, random = list(~1|r), data = bolnick)
+		summary(mod3_RE)
+
+```
+
+Now, you will notice here that the variance component, r, is simply just the between study random effect estimate, $tau^2$, in the random effect model. This all makes perfect sense because we are assuming a single data point per study. We could just as easily switch the random effect to spp and get the same result:
+
+```{r echo = TRUE, eval = TRUE, message = FALSE, warning = FALSE}
+	# Random effects model. Here, we need to assume that each species is a study
+		mod3_RE_sp <- rma.mv(es ~ 1, V = sv, random = list(~1|spp), data = bolnick)
+		summary(mod3_RE_sp)
+
+```
+
+Now that everyone is hopefully clear on this, I hope, we can fit a phylogenetic model where we now describe a covariance structure within the spp random effect 
+
+```{r echo = TRUE, eval = TRUE, message = FALSE, warning = FALSE}
+# Random effects model. Here, we need to assume that each species is a study. R is the correlation matrix within the random effect spp
+		mod4_RE_phy <- rma.mv(es ~ 1, V = sv, random = list(~1|spp), R = list(spp = A_metafor_bolnick), data = bolnick)
+		summary(mod4_RE_phy)
+
+```
+
+What we notice here is that, as expected, CI's go way up, but we are not reproducing the result in Chamberlain *et al.* 2012. CI's are nowhere near comparable and the point estimate is ~ < 0.15, but I suppose it is close. Either way, how they derived their CI's is anyone's guess at this stage. 
+
+#### Model fit and AIC
+Lets have a look at the AIC, almost certainly the non-phylogenetic model will be better in this case.
+
+```{r echo = TRUE, eval = TRUE, message = FALSE, warning = FALSE}
+	AIC(mod3_RE_sp, mod4_RE_phy)
+```
+
+As expected, the phylogenetic model is a far poorer fit.
+
+## Bolnick & Preisser, 2005 data – `MCMCglmm`
+
+We can do some sanity checks by comparing results to those from MCMCglmm. We'll stay focused on the random effects and phylogenetic models for the time being though as I haven't though too hard about how to fit these in MCMCglmm and because random effects models are more appropriate in any case.
+
+#### Random Effect Model 
+```{r echo = TRUE, eval = TRUE, message = FALSE, warning = FALSE}
+	# Random effects model in MCMCglmmm. Here, we need to assume that each species is a study. We don't actually need to estimate a random effect here because the R is the random effect in our case. So, this will match the model mod3_RE_sp above pretty darn closely
+		mod1_RE_MCMC <- MCMCglmm(es ~ 1, mev = bolnick$sv, data = bolnick, verbose = FALSE)
+		summary(mod1_RE_MCMC)
+		summary(mod3_RE_sp)
+
+```
+
+OK, hopefully this also helps us understand better what a random effect model actually is. We can do things a little differently to estimate the same model in a slightly more digestible way. We can, for example, fix `units` and this should give us the same model as above. I realized that we can't fix V = 0, but we can set it to a very small number and estimate a `spp` random effect. Lets try the following:
+
+```{r echo = TRUE, eval = TRUE, message = FALSE, warning = FALSE}
+	# Random effects model in MCMCglmmm – alternative way to code
+		prior = list(R = list(V = 0.0001, fix = 1), G = list(G1 = list(V = 1, nu = 1, alpha.mu = 0, alpha.V = 100)))
+		mod1.2_RE_MCMC <- MCMCglmm(es ~ 1, mev = bolnick$sv, random = ~spp, data = bolnick, verbose = FALSE, prior = prior)
+		summary(mod1.2_RE_MCMC)
+
+```
+Again, this is the same model, basically. 
+
+#### Phylogenetic random effects model
+
+Now that we have sorted this stuff out, and we are comfortable that `mod1_RE_MCMC` and `mod3_RE_sp` are basically the same model (minus sampling changes resulting from Bayesian approaches), we can have a look at fitting the phylogeny. This can also be done in a couple of different ways. I'll do the most general way first:
+
+
+```{r echo = TRUE, eval = TRUE, message = FALSE, warning = FALSE}
+	# Random effects model in MCMCglmmm – alternative way to code
+		prior = list(R = list(V = 0.0001, fix = 1), G = list(G1 = list(V = 1, nu = 1, alpha.mu = 0, alpha.V = 100)))
+		mod2_phylo_MCMC <- MCMCglmm(es ~ 1, mev = bolnick$sv, random = ~spp, data = bolnick, verbose = FALSE, ginverse = list(spp = A_MCMCglmm_bolnick), prior = prior)
+		summary(mod2_phylo_MCMC)
+```
+
+## Agrawal et al. 2005 data – `metafor`
+
+Lets now have a look at the Agrawal dataset, which is bigger. Here, we'll just use metafor for simplicity, but we can apply MCMCglmm to these down the road.
+
+#### Fixed Effect Model
+```{r echo = TRUE, eval = TRUE, message = FALSE, warning = FALSE}
+
+	# Fixed/common effects model
+		modAg_FE <- rma(es ~ 1, vi = sv, method = "FE", data = agrawal)
+		summary(modAg_FE)
+```
+
+OK, this matches, but again, seems to match black (which is thought to include the phylogeny).
+
+#### Random Effect Model 
+```{r echo = TRUE, eval = TRUE, message = FALSE, warning = FALSE}
+	# Random effects model. Here, we need to assume that each species is a study
+		modAg_RE <- rma(es ~ 1, vi = sv, data = agrawal)
+		summary(modAg_RE)
+```
+
+OK, this matches, but again, seems to match black (which is thought to include the phylogeny).
+
+#### Phylogenetic Model
+
+```{r echo = TRUE, eval = TRUE, message = FALSE, warning = FALSE}
+# Random effects model. Here, we need to assume that each species is a study. R is the correlation matrix within the random effect spp
+		modAg_RE_phy <- rma.mv(es ~ 1, V = sv, random = list(~1|spp), R = list(spp = A_metafor_agrawal), data = agrawal)
+		summary(modAg_RE_phy)
+
+```
+This matches, but the CI's don't.
+
+
+# References
