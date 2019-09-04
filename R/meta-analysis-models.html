@@ -9,7 +9,7 @@
 <meta name="generator" content="pandoc" />
 
 
-<meta name="author" content="Eve Cooper, Daniel Noble, Loeske Kruuk, Micheal Jennions, Matt Symounds, Tim Bonnett, Shinichi Nakagawa et al." />
+<meta name="author" content="Eve Cooper, Daniel Noble, Loeske Kruuk, Micheal Jennions, Matt Symonds, Tim Bonnett, Shinichi Nakagawa et al." />
 
 
 <title>Phylogenetic meta-analytic models</title>
@@ -1633,7 +1633,7 @@ div.tocify {
 
 
 <h1 class="title toc-ignore">Phylogenetic meta-analytic models</h1>
-<h4 class="author">Eve Cooper, Daniel Noble, Loeske Kruuk, Micheal Jennions, Matt Symounds, Tim Bonnett, Shinichi Nakagawa et al.</h4>
+<h4 class="author">Eve Cooper, Daniel Noble, Loeske Kruuk, Micheal Jennions, Matt Symonds, Tim Bonnett, Shinichi Nakagawa et al.</h4>
 <h4 class="date">04 September, 2019</h4>
 
 </div>
@@ -2342,15 +2342,19 @@ is.ultrametric(bolnick_tree) # TRUE</code></pre>
     A_metafor_agrawal &lt;- ape::vcv(agrawal_tree, corr = TRUE)
     A_metafor_bolnick &lt;- ape::vcv(bolnick_tree, corr = TRUE)
 
-# For MCMCglmm we use the inverse of the (co)variance matrix. Maybe scale (can't remember if this will make much of a difference when we use ginverse – Dan to check.)
-    A_MCMCglmm_agrawal &lt;- MCMCglmm::inverseA(agrawal_tree)$Ainv
-    A_MCMCglmm_bolnick &lt;- MCMCglmm::inverseA(bolnick_tree)$Ainv</code></pre>
+# For MCMCglmm we use the inverse of the (co)variance matrix. Maybe scale (can't remember if this will make much of a difference when we use ginverse – Dan to check.) – DN Checked...use scale
+    A_MCMCglmm_agrawal &lt;- MCMCglmm::inverseA(agrawal_tree, scale =TRUE)$Ainv
+    A_MCMCglmm_bolnick &lt;- MCMCglmm::inverseA(bolnick_tree, scale = TRUE)$Ainv</code></pre>
 <p>Great. Now we have the matrices we need to feed into the phylogenetic meta-analytic models. We’ll run these next.</p>
 </div>
 <div id="meta-analytic-models" class="section level1">
 <h1>Meta-analytic models</h1>
 <p>Chamberlain et al. 2012 ran fixed, random and phylogenetic versions of each of these models, but they ran these in some custom package. To sort out what they actually ran, and if we can match their results, we’ll start out with what I think they did. Although, I could be wrong.</p>
 <p>We’ll first start off fitting models with metafor as this holds the traditional philosophical structure for meta-analytic models. We need to remember, because of this, by default metafor does NOT fit a residual error. This is weird, I know, but relates back to how meta-analysis was conceived. Common/fixed effect models originally were conceived thinking that the sample if “studies” were so homogeneous and experiments run in such identical ways that the only real reason why effects would differ across studies was because they have different sampling variance. As such, all the residual or within-study variance was thought to be completely explained by the known sampling variance. This is pretty bonkers when you think about this assumption – it really only applies is very, very restricted situations. For example, like when a lab, running the same experiment, with samples of the same species and population have repeatable run the experiment and want to combine the statistical results. Obviously, to think fixed effect models are even remotely useful in complex datasets in ecology and evolution is probably a stretch. Hence, we don’t recommend fixed effect models. Rather, its better to run a random effects model as it better captures sources of variance likely encountered…but still makes some odd assumption. The random-effects model at least acknowledges that studies ate likely to differ from one another, and explicitly estimate a between study variance. However, it still assumes that all within study variance is a result from sampling error.</p>
+<div id="bolnick-preisser-2005-data-metafor" class="section level2">
+<h2>Bolnick &amp; Preisser, 2005 data – <code>metafor</code></h2>
+<div id="fixed-effect-model" class="section level4">
+<h4>Fixed Effect Model</h4>
 <pre class="r"><code>    # Fixed/common effects model
         mod1_FE &lt;- rma(es ~ 1, vi = sv, method = &quot;FE&quot;, data = bolnick)
         summary(mod1_FE)</code></pre>
@@ -2370,7 +2374,11 @@ is.ultrametric(bolnick_tree) # TRUE</code></pre>
 ## 
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</code></pre>
-<pre class="r"><code>    # Random effects model. Here, we need to assume that each species in a study
+<p>This effect is similar to the fixed effect estimated for the supposed “fixed-effects phylogenetic model” in Chamberlain <em>et al.</em> 2012. I don’t yet understand how they did a fixed effect model with a phylogeny, but I can’t actually reproduce the supposed ‘fixed effect model estimate’, which is &gt; 1.5, so I am not quite sure what they have done (maybe mixed up estimates???). Nonetheless, for these datasets the fixed effect models are not particularly useful in my opinion.</p>
+</div>
+<div id="random-effect-model" class="section level4">
+<h4>Random Effect Model</h4>
+<pre class="r"><code>    # Random effects model. Here, we need to assume that each species is a study
         mod2_RE &lt;- rma(es ~ 1, vi = sv, data = bolnick)
         summary(mod2_RE)</code></pre>
 <pre><code>## 
@@ -2394,6 +2402,286 @@ is.ultrametric(bolnick_tree) # TRUE</code></pre>
 ## 
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</code></pre>
+<p>Here, our estimates from the random effects model match the supposed phylogenetic estimate almost to the dot, as well as the CI’s. Although, funny enough what we are seeing is that there is little difference between phylogeny and random effects model here anyway. You will also note that, despite this being a random effects model there is no residual/observation-level error estimated, which in this case is simply captured by the between study variance as we have one data point per study. Within study sampling variance is assumed to be the sampling variance.</p>
+</div>
+<div id="phylogenetic-random-effects-model" class="section level4">
+<h4>Phylogenetic Random Effects Model</h4>
+<p>Now we will move to some new syntax. First, to get a better sense of how the above random effects model relates to syntax in the multi-level random effects model world, we can change to the multi-level context as follows and estimate what is the identical random effects model (without the added Q stats etc).</p>
+<pre class="r"><code>    bolnick$r &lt;- 1:nrow(bolnick)
+
+    # Random effects model. Here, we need to assume that each species is a study
+        mod3_RE &lt;- rma.mv(es ~ 1, V = sv, random = list(~1|r), data = bolnick)
+        summary(mod3_RE)</code></pre>
+<pre><code>## 
+## Multivariate Meta-Analysis Model (k = 28; method: REML)
+## 
+##   logLik  Deviance       AIC       BIC      AICc 
+## -31.9521   63.9042   67.9042   70.4959   68.4042   
+## 
+## Variance Components:
+## 
+##             estim    sqrt  nlvls  fixed  factor 
+## sigma^2    0.5135  0.7166     28     no       r 
+## 
+## Test for Heterogeneity:
+## Q(df = 27) = 1581.5508, p-val &lt; .0001
+## 
+## Model Results:
+## 
+## estimate      se    zval    pval    ci.lb   ci.ub 
+##   0.0477  0.1447  0.3295  0.7418  -0.2359  0.3313    
+## 
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</code></pre>
+<p>Now, you will notice here that the variance component, r, is simply just the between study random effect estimate, <span class="math inline">\(tau^2\)</span>, in the random effect model. This all makes perfect sense because we are assuming a single data point per study. We could just as easily switch the random effect to spp and get the same result:</p>
+<pre class="r"><code>    # Random effects model. Here, we need to assume that each species is a study
+        mod3_RE_sp &lt;- rma.mv(es ~ 1, V = sv, random = list(~1|spp), data = bolnick)
+        summary(mod3_RE_sp)</code></pre>
+<pre><code>## 
+## Multivariate Meta-Analysis Model (k = 28; method: REML)
+## 
+##   logLik  Deviance       AIC       BIC      AICc 
+## -31.9521   63.9042   67.9042   70.4959   68.4042   
+## 
+## Variance Components:
+## 
+##             estim    sqrt  nlvls  fixed  factor 
+## sigma^2    0.5135  0.7166     28     no     spp 
+## 
+## Test for Heterogeneity:
+## Q(df = 27) = 1581.5508, p-val &lt; .0001
+## 
+## Model Results:
+## 
+## estimate      se    zval    pval    ci.lb   ci.ub 
+##   0.0477  0.1447  0.3295  0.7418  -0.2359  0.3313    
+## 
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</code></pre>
+<p>Now that everyone is hopefully clear on this, I hope, we can fit a phylogenetic model where we now describe a covariance structure within the spp random effect</p>
+<pre class="r"><code># Random effects model. Here, we need to assume that each species is a study. R is the correlation matrix within the random effect spp
+        mod4_RE_phy &lt;- rma.mv(es ~ 1, V = sv, random = list(~1|spp), R = list(spp = A_metafor_bolnick), data = bolnick)
+        summary(mod4_RE_phy)</code></pre>
+<pre><code>## 
+## Multivariate Meta-Analysis Model (k = 28; method: REML)
+## 
+##   logLik  Deviance       AIC       BIC      AICc 
+## -54.1822  108.3644  112.3644  114.9561  112.8644   
+## 
+## Variance Components:
+## 
+##              estim    sqrt  nlvls  fixed  factor    R 
+## sigma^2    18.8407  4.3406     28     no     spp  yes 
+## 
+## Test for Heterogeneity:
+## Q(df = 27) = 1581.5508, p-val &lt; .0001
+## 
+## Model Results:
+## 
+## estimate      se     zval    pval    ci.lb   ci.ub 
+##  -0.0744  2.4310  -0.0306  0.9756  -4.8391  4.6904    
+## 
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</code></pre>
+<p>What we notice here is that, as expected, CI’s go way up, but we are not reproducing the result in Chamberlain <em>et al.</em> 2012. CI’s are nowhere near comparable and the point estimate is ~ &lt; 0.15, but I suppose it is close. Either way, how they derived their CI’s is anyone’s guess at this stage.</p>
+</div>
+<div id="model-fit-and-aic" class="section level4">
+<h4>Model fit and AIC</h4>
+<p>Lets have a look at the AIC, almost certainly the non-phylogenetic model will be better in this case.</p>
+<pre class="r"><code>    AIC(mod3_RE_sp, mod4_RE_phy)</code></pre>
+<pre><code>##             df      AIC
+## mod3_RE_sp   2  67.9042
+## mod4_RE_phy  2 112.3644</code></pre>
+<p>As expected, the phylogenetic model is a far poorer fit.</p>
+</div>
+</div>
+<div id="bolnick-preisser-2005-data-mcmcglmm" class="section level2">
+<h2>Bolnick &amp; Preisser, 2005 data – <code>MCMCglmm</code></h2>
+<p>We can do some sanity checks by comparing results to those from MCMCglmm. We’ll stay focused on the random effects and phylogenetic models for the time being though as I haven’t though too hard about how to fit these in MCMCglmm and because random effects models are more appropriate in any case.</p>
+<div id="random-effect-model-1" class="section level4">
+<h4>Random Effect Model</h4>
+<pre class="r"><code>    # Random effects model in MCMCglmmm. Here, we need to assume that each species is a study. We don't actually need to estimate a random effect here because the R is the random effect in our case. So, this will match the model mod3_RE_sp above pretty darn closely
+        mod1_RE_MCMC &lt;- MCMCglmm(es ~ 1, mev = bolnick$sv, data = bolnick, verbose = FALSE)
+        summary(mod1_RE_MCMC)</code></pre>
+<pre><code>## 
+##  Iterations = 3001:12991
+##  Thinning interval  = 10
+##  Sample size  = 1000 
+## 
+##  DIC: 66.5389 
+## 
+##  R-structure:  ~units
+## 
+##       post.mean l-95% CI u-95% CI eff.samp
+## units    0.5572   0.2802   0.9484     1000
+## 
+##  Location effects: es ~ 1 
+## 
+##             post.mean l-95% CI u-95% CI eff.samp pMCMC
+## (Intercept)   0.05245 -0.24342  0.33569     1000  0.71</code></pre>
+<pre class="r"><code>        summary(mod3_RE_sp)</code></pre>
+<pre><code>## 
+## Multivariate Meta-Analysis Model (k = 28; method: REML)
+## 
+##   logLik  Deviance       AIC       BIC      AICc 
+## -31.9521   63.9042   67.9042   70.4959   68.4042   
+## 
+## Variance Components:
+## 
+##             estim    sqrt  nlvls  fixed  factor 
+## sigma^2    0.5135  0.7166     28     no     spp 
+## 
+## Test for Heterogeneity:
+## Q(df = 27) = 1581.5508, p-val &lt; .0001
+## 
+## Model Results:
+## 
+## estimate      se    zval    pval    ci.lb   ci.ub 
+##   0.0477  0.1447  0.3295  0.7418  -0.2359  0.3313    
+## 
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</code></pre>
+<p>OK, hopefully this also helps us understand better what a random effect model actually is. We can do things a little differently to estimate the same model in a slightly more digestible way. We can, for example, fix <code>units</code> and this should give us the same model as above. I realized that we can’t fix V = 0, but we can set it to a very small number and estimate a <code>spp</code> random effect. Lets try the following:</p>
+<pre class="r"><code>    # Random effects model in MCMCglmmm – alternative way to code
+        prior = list(R = list(V = 0.0001, fix = 1), G = list(G1 = list(V = 1, nu = 1, alpha.mu = 0, alpha.V = 100)))
+        mod1.2_RE_MCMC &lt;- MCMCglmm(es ~ 1, mev = bolnick$sv, random = ~spp, data = bolnick, verbose = FALSE, prior = prior)
+        summary(mod1.2_RE_MCMC)</code></pre>
+<pre><code>## 
+##  Iterations = 3001:12991
+##  Thinning interval  = 10
+##  Sample size  = 1000 
+## 
+##  DIC: 881.0355 
+## 
+##  G-structure:  ~spp
+## 
+##     post.mean l-95% CI u-95% CI eff.samp
+## spp    0.5941    0.276   0.9631    911.1
+## 
+##  R-structure:  ~units
+## 
+##       post.mean l-95% CI u-95% CI eff.samp
+## units     1e-04    1e-04    1e-04        0
+## 
+##  Location effects: es ~ 1 
+## 
+##             post.mean l-95% CI u-95% CI eff.samp pMCMC
+## (Intercept)    0.0519  -0.2761   0.3410     1000 0.758</code></pre>
+<p>Again, this is the same model, basically.</p>
+</div>
+<div id="phylogenetic-random-effects-model-1" class="section level4">
+<h4>Phylogenetic random effects model</h4>
+<p>Now that we have sorted this stuff out, and we are comfortable that <code>mod1_RE_MCMC</code> and <code>mod3_RE_sp</code> are basically the same model (minus sampling changes resulting from Bayesian approaches), we can have a look at fitting the phylogeny. This can also be done in a couple of different ways. I’ll do the most general way first:</p>
+<pre class="r"><code>    # Random effects model in MCMCglmmm – alternative way to code
+        prior = list(R = list(V = 0.0001, fix = 1), G = list(G1 = list(V = 1, nu = 1, alpha.mu = 0, alpha.V = 100)))
+        mod2_phylo_MCMC &lt;- MCMCglmm(es ~ 1, mev = bolnick$sv, random = ~spp, data = bolnick, verbose = FALSE, ginverse = list(spp = A_MCMCglmm_bolnick), prior = prior)
+        summary(mod2_phylo_MCMC)</code></pre>
+<pre><code>## 
+##  Iterations = 3001:12991
+##  Thinning interval  = 10
+##  Sample size  = 1000 
+## 
+##  DIC: 881.2311 
+## 
+##  G-structure:  ~spp
+## 
+##     post.mean l-95% CI u-95% CI eff.samp
+## spp     19.73    9.249    32.19      782
+## 
+##  R-structure:  ~units
+## 
+##       post.mean l-95% CI u-95% CI eff.samp
+## units     1e-04    1e-04    1e-04        0
+## 
+##  Location effects: es ~ 1 
+## 
+##             post.mean l-95% CI u-95% CI eff.samp pMCMC
+## (Intercept)   0.02475 -5.21622  4.67082     1000 0.992</code></pre>
+</div>
+</div>
+<div id="agrawal-et-al.2005-data-metafor" class="section level2">
+<h2>Agrawal et al. 2005 data – <code>metafor</code></h2>
+<p>Lets now have a look at the Agrawal dataset. Here, we’ll just use metafor for simplicity, but we can apply MCMCglmm to these down the road, but this dataset is smaller so we should be aware that there are likely to be some problems.</p>
+<div id="fixed-effect-model-1" class="section level4">
+<h4>Fixed Effect Model</h4>
+<pre class="r"><code>    # Fixed/common effects model
+        modAg_FE &lt;- rma(es ~ 1, vi = sv, method = &quot;FE&quot;, data = agrawal)
+        summary(modAg_FE)</code></pre>
+<pre><code>## 
+## Fixed-Effects Model (k = 15)
+## 
+##   logLik  deviance       AIC       BIC      AICc 
+## -17.0464    8.7664   36.0928   36.8008   36.4005   
+## 
+## Test for Heterogeneity:
+## Q(df = 14) = 8.7664, p-val = 0.8457
+## 
+## Model Results:
+## 
+## estimate      se     zval    pval    ci.lb   ci.ub 
+##  -0.2573  0.2370  -1.0858  0.2776  -0.7218  0.2071    
+## 
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</code></pre>
+<p>OK, this matches, but again, seems to match black (which is thought to include the phylogeny).</p>
+</div>
+<div id="random-effect-model-2" class="section level4">
+<h4>Random Effect Model</h4>
+<pre class="r"><code>    # Random effects model. Here, we need to assume that each species is a study
+        modAg_RE &lt;- rma(es ~ 1, vi = sv, data = agrawal)
+        summary(modAg_RE)</code></pre>
+<pre><code>## 
+## Random-Effects Model (k = 15; tau^2 estimator: REML)
+## 
+##   logLik  deviance       AIC       BIC      AICc 
+## -16.2133   32.4265   36.4265   37.7046   37.5174   
+## 
+## tau^2 (estimated amount of total heterogeneity): 0 (SE = 0.3136)
+## tau (square root of estimated tau^2 value):      0
+## I^2 (total heterogeneity / total variability):   0.00%
+## H^2 (total variability / sampling variability):  1.00
+## 
+## Test for Heterogeneity:
+## Q(df = 14) = 8.7664, p-val = 0.8457
+## 
+## Model Results:
+## 
+## estimate      se     zval    pval    ci.lb   ci.ub 
+##  -0.2573  0.2370  -1.0858  0.2776  -0.7218  0.2071    
+## 
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</code></pre>
+<p>OK, this matches, but again, seems to match black (which is thought to include the phylogeny). Also, there seems to be some problems estimating <span class="math inline">\(tau^2\)</span>.I’ll have a closer look at this, but it will probably mean the phylogenetic model will be no different.</p>
+</div>
+<div id="phylogenetic-model" class="section level4">
+<h4>Phylogenetic Model</h4>
+<pre class="r"><code># Random effects model. Here, we need to assume that each species is a study. R is the correlation matrix within the random effect spp
+        modAg_RE_phy &lt;- rma.mv(es ~ 1, V = sv, random = list(~1|spp), R = list(spp = A_metafor_agrawal), data = agrawal)
+        summary(modAg_RE_phy)</code></pre>
+<pre><code>## 
+## Multivariate Meta-Analysis Model (k = 15; method: REML)
+## 
+##   logLik  Deviance       AIC       BIC      AICc 
+## -16.2133   32.4265   36.4265   37.7046   37.5174   
+## 
+## Variance Components:
+## 
+##             estim    sqrt  nlvls  fixed  factor    R 
+## sigma^2    0.0000  0.0000     15     no     spp  yes 
+## 
+## Test for Heterogeneity:
+## Q(df = 14) = 8.7664, p-val = 0.8457
+## 
+## Model Results:
+## 
+## estimate      se     zval    pval    ci.lb   ci.ub 
+##  -0.2573  0.2370  -1.0858  0.2776  -0.7218  0.2071    
+## 
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</code></pre>
+<p>This matches, but the CI’s don’t. Again, as expected, there are no changes as the sigma is not estimated correctly.</p>
+</div>
+</div>
 </div>
 <div id="references" class="section level1">
 <h1>References</h1>

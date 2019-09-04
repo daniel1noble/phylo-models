@@ -141,7 +141,6 @@ Now that everyone is hopefully clear on this, I hope, we can fit a phylogenetic 
 # Random effects model. Here, we need to assume that each species is a study. R is the correlation matrix within the random effect spp
 		mod4_RE_phy <- rma.mv(es ~ 1, V = sv, random = list(~1|spp), R = list(spp = A_metafor_bolnick), data = bolnick)
 		summary(mod4_RE_phy)
-
 ```
 
 What we notice here is that, as expected, CI's go way up, but we are not reproducing the result in Chamberlain *et al.* 2012. CI's are nowhere near comparable and the point estimate is ~ < 0.15, but I suppose it is close. Either way, how they derived their CI's is anyone's guess at this stage. 
@@ -177,12 +176,12 @@ OK, hopefully this also helps us understand better what a random effect model ac
 		summary(mod1.2_RE_MCMC)
 
 ```
+
 Again, this is the same model, basically. 
 
 #### Phylogenetic random effects model
 
 Now that we have sorted this stuff out, and we are comfortable that `mod1_RE_MCMC` and `mod3_RE_sp` are basically the same model (minus sampling changes resulting from Bayesian approaches), we can have a look at fitting the phylogeny. This can also be done in a couple of different ways. I'll do the most general way first:
-
 
 ```{r echo = TRUE, eval = TRUE, message = FALSE, warning = FALSE}
 	# Random effects model in MCMCglmmm – alternative way to code
@@ -193,7 +192,7 @@ Now that we have sorted this stuff out, and we are comfortable that `mod1_RE_MCM
 
 ## Agrawal et al. 2005 data – `metafor`
 
-Lets now have a look at the Agrawal dataset, which is bigger. Here, we'll just use metafor for simplicity, but we can apply MCMCglmm to these down the road.
+Lets now have a look at the Agrawal dataset. Here, we'll just use metafor for simplicity, but we can apply MCMCglmm to these down the road, but this dataset is smaller so we should be aware that there are likely to be some problems.
 
 #### Fixed Effect Model
 ```{r echo = TRUE, eval = TRUE, message = FALSE, warning = FALSE}
@@ -212,7 +211,7 @@ OK, this matches, but again, seems to match black (which is thought to include t
 		summary(modAg_RE)
 ```
 
-OK, this matches, but again, seems to match black (which is thought to include the phylogeny).
+OK, this matches, but again, seems to match black (which is thought to include the phylogeny). Also, there seems to be some problems estimating $tau^2$.I'll have a closer look at this, but it will probably mean the phylogenetic model will be no different.
 
 #### Phylogenetic Model
 
@@ -222,7 +221,7 @@ OK, this matches, but again, seems to match black (which is thought to include t
 		summary(modAg_RE_phy)
 
 ```
-This matches, but the CI's don't.
+This matches, but the CI's don't. Again, as expected, there are no changes as the sigma is not estimated correctly.
 
 
 # References
