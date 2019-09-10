@@ -209,6 +209,31 @@ OK, this matches, but again, seems to match black (which is thought to include t
 	# Random effects model. Here, we need to assume that each species is a study
 		modAg_RE <- rma(es ~ 1, vi = sv, data = agrawal)
 		summary(modAg_RE)
+		
+		#Dersimion&Laird
+		modAg_RE_DL <- rma(es ~ 1, vi = sv, data = agrawal, method = "DL")
+		summary(modAg_RE_DL)
+		
+		#HE
+		modAg_RE_HE <- rma(es ~ 1, vi = sv, data = agrawal, method = "HE")
+		summary(modAg_RE_HE)
+		
+		# SJ
+		modAg_RE_SJ <- rma(es ~ 1, vi = sv, data = agrawal, method = "SJ")
+		summary(modAg_RE_SJ)
+		
+		# ML
+		modAg_RE_ML <- rma(es ~ 1, vi = sv, data = agrawal, method = "ML")
+		summary(modAg_RE_ML)
+		
+		# EB
+		modAg_RE_EB <- rma(es ~ 1, vi = sv, data = agrawal, method = "EB")
+		summary(modAg_RE_EB)
+		
+		# HS
+		modAg_RE_HS <- rma(es ~ 1, vi = sv, data = agrawal, method = "HS")
+		summary(modAg_RE_HS)
+
 ```
 
 OK, this matches, but again, seems to match black (which is thought to include the phylogeny). Also, there seems to be some problems estimating $tau^2$.I'll have a closer look at this, but it will probably mean the phylogenetic model will be no different.
