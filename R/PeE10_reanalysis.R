@@ -22,7 +22,7 @@ table(Persson$sv)
 #another note: Chamberlain graph for RE and FE models are the same for this one
 
 # Read the tree
-Persson_tree <- read.tree("Chamberlain_supp/chamberlain_data/PerssonEtal2010Oikos_tree.txt")
+Persson_tree <- read.tree("datasets/PerssonETal2010Oikos_tree.txt")
 # Plot the tree to have a look
 plot(Persson_tree, type = "phylogram", main = "Persson et al. 2010")
 # We need to check trees are ultmetric
@@ -51,7 +51,8 @@ PerssonSub_RE <- rma(es ~ 1, vi = sv, data = PerssonSub)
 summary(PerssonSub_RE)
 #model runs but tau is estimated as 0
 #estimate = 0.059 (-0.09,0.21)
-#we get an es almost an order of magnitude lower than Chamberlain...possibly because we excluded the weird datapoint!
+#we get an es almost an order of magnitude lower than Chamberlain
+#possibly because we excluded the outlier
 
 
 #meta-regression
@@ -166,10 +167,7 @@ summary(PerssonMCMC_phymod)
 #slightly larger ES for group 2 (0.64) when phylo included but becomes NS due to large CI
 
 
-#I think the y-axis in Chamberlain fig4(u) is just mislabeled and so all their estimates appear larger than they are
-#our relative differences between effect sizes in RE vs. phylo roughly match Chamberlain
-#the main differences are thus
-#the scale is an order of magnitude different (possibly just a figure error in Chamberlain paper)
+#maybe the y-axis in Chamberlain fig4(u) is just mislabeled and so all their estimates appear larger than they are?
 #the CI we estimate are much larger than those estimated in Chamberlain
 #the large CI we estimate results in no sig difference between RE vs. phylo in our analysis
 

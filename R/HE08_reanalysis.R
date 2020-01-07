@@ -106,5 +106,6 @@ AIC(Honnay_phymod,Honnay_REmod)
 
 #conclusion
 #we find controlling for phylogeny has no influence on ES for any group, and does not affect model fit either
-#this is contrary to Chamberlain who found a sig. different effect size in factor0 (tr) when phylo controlled
+#Chamberlain found a significantly different effect in the tr group when phylo controlled for
+
 
